@@ -1,0 +1,27 @@
+name: Deploy Worker
+on:
+  push:
+    branches: [master]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Replace IDs in wrangler.jsonc
+        run: |
+          # Replace DATABASE_ID
+          sed -i 's|\${D1_DATABASE_ID}|'"${{ secrets.D1_DATABASE_ID }}"'|g' wrangler.jsonc
+          # Replace AI_QUOTA_KV_ID
+          sed -i 's|\${AI_QUOTA_KV_ID}|'"${{ secrets.AI_QUOTA_KV_ID }}"'|g' wrangler.jsonc
+          # Replace RATE_LIMIT_KV_ID
+          sed -i 's|\${RATE_LIMIT_KV_ID}|'"${{ secrets.RATE_LIMIT_KV_ID }}"'|g' wrangler.jsonc
+
+      - name: Deploy Worker
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          wranglerVersion: "4.67.0"
