@@ -783,9 +783,8 @@ function handleRoot() {
   const authErr  = document.getElementById('auth-error');
   const tokenIn  = document.getElementById('token-input');
 
-  // Restore session on page load. sessionStorage survives a refresh but is cleared 
-  // when the tab closes. This is
-  appropriate for an admin token that should not persist indefinitely.
+   // Restore session on page load. sessionStorage survives a refresh but is cleared
+  // when the tab closes. This is appropriate for an admin token that should not persist indefinitely.
   const _saved = sessionStorage.getItem('iw_token');
   if (_saved) {
     TOKEN = _saved;
@@ -1371,121 +1370,121 @@ async function handleAudit(request, env) {
 
 // ─── Upload endpoint ──────────────────────────────────────────────────────────
 async function handleUpload(request, env) {
-	if (request.method !== 'POST') {
-		return new Response('Method Not Allowed', { status: 405, headers: { Allow: 'POST' } });
-	}
+  if (request.method !== 'POST') {
+    return new Response('Method Not Allowed', { status: 405, headers: { Allow: 'POST' } });
+  }
 
-	const authError = requireBearer(request, env);
-	if (authError) return authError;
+  const authError = requireBearer(request, env);
+  if (authError) return authError;
 
-	let body;
-	try {
-		body = await request.json();
-	} catch {
-		return jsonError('Invalid JSON — expected: {"url":"https://...", "description":"optional alt text"}', 400);
-	}
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return jsonError('Invalid JSON — expected: {"url":"https://...", "description":"optional alt text"}', 400);
+  }
 
-	const sourceUrl = String(body?.url ?? '').trim();
-	if (!/^https?:\/\/.+/.test(sourceUrl)) {
-		return jsonError('Valid https URL required', 400);
-	}
+  const sourceUrl = String(body?.url ?? '').trim();
+  if (!/^https?:\/\/.+/.test(sourceUrl)) {
+    return jsonError('Valid https URL required', 400);
+  }
 
-	if (!isSafeUrl(sourceUrl)) {
-		return withCors(jsonError('URL resolves to a disallowed network range', 400));
-	}
+  if (!isSafeUrl(sourceUrl)) {
+    return withCors(jsonError('URL resolves to a disallowed network range', 400));
+  }
 
-	// Optional manual description — if provided, AI generation is skipped entirely
-	const manualAlt = sanitiseAltText(String(body?.description ?? '').trim());
+  // If description is provided, AI generation is skipped entirely
+  const manualAlt = sanitiseAltText(String(body?.description ?? '').trim());
 
-	try {
-		const existing = await env.DB
-			.prepare('SELECT id FROM images WHERE source_url = ?')
-			.bind(sourceUrl)
-			.first();
+  try {
+    const existing = await env.DB
+      .prepare('SELECT id FROM images WHERE source_url = ?')
+      .bind(sourceUrl)
+      .first();
 
-		if (existing) {
-			return withCors(Response.json(
-				{ imageId: existing.id, url: `/images/${existing.id}`, message: 'Already uploaded' },
-				{ status: 200 }
-			));
-		}
-	} catch (err) {
-		console.error('D1 dedupe check failed:', err);
-		return jsonError('Database unavailable', 503);
-	}
+    if (existing) {
+      return withCors(Response.json(
+        { imageId: existing.id, url: `/images/${existing.id}`, message: 'Already uploaded' },
+        { status: 200 }
+      ));
+    }
+  } catch (err) {
+    console.error('D1 dedupe check failed:', err);
+    return jsonError('Database unavailable', 503);
+  }
 
-	const controller = new AbortController();
-	const timer = setTimeout(() => controller.abort(), 10_000);
-	let imgResponse;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 10_000);
+  let imgResponse;
 
-	try {
-		imgResponse = await fetch(sourceUrl, {
-			signal: controller.signal,
-			headers: { 'User-Agent': 'Cloudflare-Worker-ImageWorker/1.0' },
-		});
-	} catch (err) {
-		return withCors(jsonError(`Failed to fetch source URL: ${err.message}`, 502));
-	} finally {
-		clearTimeout(timer);
-	}
+  try {
+    imgResponse = await fetch(sourceUrl, {
+      signal: controller.signal,
+      headers: { 'User-Agent': 'Cloudflare-Worker-ImageWorker/1.0' },
+    });
+  } catch (err) {
+    return withCors(jsonError(`Failed to fetch source URL: ${err.message}`, 502));
+  } finally {
+    clearTimeout(timer);
+  }
 
-	if (!imgResponse.ok) {
-		return withCors(jsonError(`Source URL returned ${imgResponse.status}`, 502));
-	}
+  if (!imgResponse.ok) {
+    return withCors(jsonError(`Source URL returned ${imgResponse.status}`, 502));
+  }
 
-	const mimeType = (imgResponse.headers.get('content-type') ?? '')
-		.split(';')[0].trim().toLowerCase();
-	if (!ALLOWED_TYPES.has(mimeType)) {
-		return withCors(jsonError(
-			`Unsupported media type: ${mimeType}. Allowed: ${[...ALLOWED_TYPES].join(', ')}`,
-			415
-		));
-	}
+  const mimeType = (imgResponse.headers.get('content-type') ?? '')
+    .split(';')[0].trim().toLowerCase();
+  if (!ALLOWED_TYPES.has(mimeType)) {
+    return withCors(jsonError(
+      `Unsupported media type: ${mimeType}. Allowed: ${[...ALLOWED_TYPES].join(', ')}`,
+      415
+    ));
+  }
 
-	const bytes = await imgResponse.arrayBuffer();
-	if (bytes.byteLength > MAX_IMAGE_BYTES) {
-		return withCors(jsonError(
-			`Image exceeds 10 MB limit (got ${(bytes.byteLength / 1024 / 1024).toFixed(2)} MB)`,
-			413
-		));
-	}
+  const bytes = await imgResponse.arrayBuffer();
+  if (bytes.byteLength > MAX_IMAGE_BYTES) {
+    return withCors(jsonError(
+      `Image exceeds 10 MB limit (got ${(bytes.byteLength / 1024 / 1024).toFixed(2)} MB)`,
+      413
+    ));
+  }
 
-	const imageId = crypto.randomUUID();
+  const imageId = crypto.randomUUID();
 
-	try {
-		await env.IMAGES.put(imageId, bytes, {
-			httpMetadata: { contentType: mimeType },
-			customMetadata: { sourceUrl, uploadedAt: new Date().toISOString() },
-		});
-	} catch (err) {
-		console.error('R2 put failed:', err);
-		return jsonError('Storage unavailable', 503);
-	}
+  try {
+    await env.IMAGES.put(imageId, bytes, {
+      httpMetadata: { contentType: mimeType },
+      customMetadata: { sourceUrl, uploadedAt: new Date().toISOString() },
+    });
+  } catch (err) {
+    console.error('R2 put failed:', err);
+    return jsonError('Storage unavailable', 503);
+  }
 
-	try {
-		await env.DB
-			.prepare(`
+  try {
+    await env.DB
+      .prepare(`
 				INSERT INTO images (id, source_url, alt_text, created_at)
 				VALUES (?, ?, ?, datetime('now'))
 			`)
-			.bind(imageId, sourceUrl, manualAlt || null)
-			.run();
-	} catch (err) {
-		console.error('D1 insert failed — rolling back R2:', err);
-		env.IMAGES.delete(imageId).catch(e => console.error('R2 rollback failed:', e));
-		return jsonError('Database unavailable', 503);
-	}
+      .bind(imageId, sourceUrl, manualAlt || null)
+      .run();
+  } catch (err) {
+    console.error('D1 insert failed — rolling back R2:', err);
+    env.IMAGES.delete(imageId).catch(e => console.error('R2 rollback failed:', e));
+    return jsonError('Database unavailable', 503);
+  }
 
-	return withCors(Response.json(
-		{
-			imageId,
-			url: `/images/${imageId}`,
-			message: manualAlt
-				? 'Image uploaded — alt-text set from description'
-				: 'Image uploaded — alt-text will generate on first access',
-		},
-		{ status: 201 }
-	));
+  return withCors(Response.json(
+    {
+      imageId,
+      url: `/images/${imageId}`,
+      message: manualAlt
+        ? 'Image uploaded — alt-text set from description'
+        : 'Image uploaded — alt-text will generate on first access',
+    },
+    { status: 201 }
+  ));
 }
 
 // ─── SSRF protection ──────────────────────────────────────────────────────────
