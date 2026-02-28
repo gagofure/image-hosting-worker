@@ -56,9 +56,16 @@ AI inference only runs when an image is first requested and alt-text has not yet
 
 ```bash
 npm install -g wrangler
-wrangler login
+
+```
+```bash
+export CLOUDFLARE_API_TOKEN=your-token 
 ```
 
+```bash
+wragler whoami
+# Output should show your account and token scopes
+```
 ---
 
 ## Setup
@@ -153,7 +160,16 @@ wrangler secret put ADMIN_TOKEN
 
 ### 6. Accept the Vision Model License
 
-Workers AI requires a one-time licence acceptance for the Llama vision model before it can be used. Send one request with `{ "prompt": "agree" }` to the model via the Cloudflare Dashboard AI playground, or follow the prompt in the [official docs](https://developers.cloudflare.com/workers-ai/models/llama-3.2-11b-vision-instruct/).
+Workers AI requires a one-time licence acceptance for the Llama vision model before it can be used. Send one request with `{ "prompt": "agree" }` to the model via the Cloudflare Dashboard AI playground, or follow the prompt in the [official docs](https://developers.cloudflare.com/workers-ai/models/llama-3.2-11b-vision-instruct/). you can use the script below to accept
+
+```bash
+
+curl https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/ai/run/@cf/meta/llama-3.2-11b-vision-instruct \
+   -X POST \
+   -H "Authorization: Bearer $CLOUDFLARE_AUTH_TOKEN" \
+   -d '{ "prompt": "agree"}'
+
+```
 
 ### 7. Deploy
 
@@ -287,7 +303,7 @@ wrangler dev
 
 The free tier imposes a hard daily Neuron budget, and vision models consume significantly more Neurons per call than text models. Running inference at upload time would burn quota against every image regardless of whether it is ever viewed — most of which may never be accessed in a given day. The lazy pattern inverts this: **inference only fires when a real user actually requests the image**, meaning Neurons are only spent on images people care about.
 
-**Upload-time performance.** Deliberately deferring AI is also what keeps the upload endpoint fast. At upload time the Worker does the minimum necessary work synchronously: a D1 deduplication check, an outbound fetch of the source image, an R2 write, and a D1 insert. That pipeline is I/O-bound but predictable. If inference were triggered here instead, the upload would stall for the full duration of a vision model call — typically several seconds — before returning a response to the caller. By moving AI out of the upload path entirely, the `POST /upload` endpoint returns a `201` as soon as the image is safely in R2 and D1, and the caller is never made to wait for something that does not block storage. The AI work happens later, in the background of the first `GET /images/:uuid` request, via `ctx.waitUntil()` so even that response is not delayed.
+**Upload-time performance.** Deliberately deferring AI is also what keeps the upload endpoint fast. At upload time the Worker does the minimum necessary work synchronously: a D1 deduplication check, an outbound fetch of the source image, an R2 write, and a D1 insert. That pipeline is I/O-bound but predictable. If inference were triggered here instead, the upload would stall for the full duration of a vision model call — typically several seconds — before returning a response to the caller. By moving AI out of the upload path entirely, the `POST /upload` endpoint returns a `201` as soon as the image is safely in R2 and D1, and the caller is never made to wait for something that does not block storage. The AI work happens later, in the background of the first `GET /images/:uuid` request, via `ctx.waitUntil()` so even that response is not delayed. 
 
 Three additional layers protect the budget further:
 
@@ -314,14 +330,7 @@ Together these three layers form a cost funnel: the Cache API eliminates the vas
 
 - **Error 1102** (CPU/Memory exceeded): Retrieve limits from `/workers/platform/limits/`
 - **All errors**: https://developers.cloudflare.com/workers/observability/errors/
-
-## Errors
-
-- **Error 1102** (CPU/Memory exceeded): Retrieve limits from `/workers/platform/limits/`
-- **All errors**: https://developers.cloudflare.com/workers/observability/errors/
-
 ---
-
 ## Author
 
 **Ogaga Agofure** — Cloud & Infrastructure Engineer

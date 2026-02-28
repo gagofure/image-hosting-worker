@@ -25,18 +25,18 @@
  */
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
-const RATE_LIMIT_MAX = 10;
-const RATE_LIMIT_TTL = 75;
-const AI_DEDUPE_TTL = 300;
-const CACHE_MAX_AGE = 3600;
-const CACHE_PENDING_AGE = 60;
-const ALT_TEXT_MAX_LEN = 500;
-const VISION_MODEL = '@cf/meta/llama-3.2-11b-vision-instruct';
+const MAX_IMAGE_BYTES = 10 * 1024 * 1024; // 10MB limit for uploaded images
+const RATE_LIMIT_MAX = 100; // Max 100 requests per TTL per IP address
+const RATE_LIMIT_TTL = 75;  //	Rate limit window in seconds (slightly above 1 minute to account for clock skew)
+const AI_DEDUPE_TTL = 300; // Time in seconds to consider an alt-text generation "in-flight" for deduplication
+const CACHE_MAX_AGE = 3600;   // Cache alt-text for 1 hour at the edge to speed up repeat requests without hitting the model again
+const CACHE_PENDING_AGE = 60; // Cache "pending" status for 1 minute to prevent thundering herd of requests hitting the model when alt-text is being generated
+const ALT_TEXT_MAX_LEN = 500; // Truncate alt-text to 500 characters to prevent abuse and control storage costs
+const VISION_MODEL = '@cf/meta/llama-3.2-11b-vision-instruct'; // Workers AI model identifier. Change if you want to use a different vision model from the registry.
 const ALLOWED_TYPES = new Set([
-	'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/avif',
+	'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/avif', //  image formats allowed for upload
 ]);
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i; // Simple regex to validate UUIDs in image IDs and prevent path traversal
 
 // ─── CORS ───────────────────────────────────────────────────────────────────
 // Shared headers applied to every API response so browsers can read the body
@@ -135,7 +135,7 @@ function handleRoot() {
       --bg:       #0a0a09;
       --surface:  #111110;
       --border:   #222220;
-      --accent:   #e8f44d;
+      --accent:   #e8f54d;
       --accent2:  #4df4a0;
       --text:     #ede8df;
       --muted:    #6b6860;
