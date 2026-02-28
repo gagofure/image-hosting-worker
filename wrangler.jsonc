@@ -8,11 +8,35 @@
 	"main": "src/index.js",
 	"compatibility_date": "2026-02-26",
 	"observability": {
-		"enabled": true
+		"enabled": true,
 	},
-	"compatibility_flags": [
-		"nodejs_compat"
-	]
+	"compatibility_flags": ["nodejs_compat"],
+	"ai": {
+		"binding": "AI",
+	},
+	"r2_buckets": [
+		{
+			"bucket_name": "image-hosting-store",
+			"binding": "IMAGES",
+		},
+	],
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "image_hosting_db",
+			"database_id": "${D1_DATABASE_ID}",
+		},
+	],
+	"kv_namespaces": [
+		{
+			"binding": "RATE_LIMIT",
+			"id": "${RATE_LIMIT_KV_ID}",
+		},
+		{
+			"binding": "AI_QUOTA",
+			"id": "${AI_QUOTA_KV_ID}",
+		},
+	],
 	/**
 	 * Smart Placement
 	 * https://developers.cloudflare.com/workers/configuration/smart-placement/#smart-placement
