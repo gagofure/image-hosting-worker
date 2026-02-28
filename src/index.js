@@ -34,7 +34,7 @@ const CACHE_PENDING_AGE = 60; // Cache "pending" status for 1 minute to prevent 
 const ALT_TEXT_MAX_LEN = 500; // Truncate alt-text to 500 characters to prevent abuse and control storage costs
 const VISION_MODEL = '@cf/meta/llama-3.2-11b-vision-instruct'; // Workers AI model identifier. Change if you want to use a different vision model from the registry.
 const ALLOWED_TYPES = new Set([
-	'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/avif', //  image formats allowed for upload
+  'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/avif', //  image formats allowed for upload
 ]);
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i; // Simple regex to validate UUIDs in image IDs and prevent path traversal
 
@@ -42,18 +42,18 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-
 // Shared headers applied to every API response so browsers can read the body
 // and custom headers cross-origin.
 const CORS_HEADERS = {
-	'Access-Control-Allow-Origin': '*', // Restrict to your deployed origin in production
-	'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-	'Access-Control-Allow-Headers': 'Authorization, Content-Type',
-	// Expose custom and cache headers to browser JS
-	'Access-Control-Expose-Headers': 'X-Alt-Text, X-Image-Id, CF-Cache-Status, Cache-Control',
+  'Access-Control-Allow-Origin': '*', // Restrict to your deployed origin in production
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Authorization, Content-Type',
+  // Expose custom and cache headers to browser JS
+  'Access-Control-Expose-Headers': 'X-Alt-Text, X-Image-Id, CF-Cache-Status, Cache-Control',
 };
 
 /** Inject CORS headers into any existing Response without touching its body. */
 function withCors(response) {
-	const r = new Response(response.body, response);
-	for (const [k, v] of Object.entries(CORS_HEADERS)) r.headers.set(k, v);
-	return r;
+  const r = new Response(response.body, response);
+  for (const [k, v] of Object.entries(CORS_HEADERS)) r.headers.set(k, v);
+  return r;
 }
 
 // ─── Alt-text sanitisation ──────────────────────────────────────────────────
@@ -62,65 +62,65 @@ function withCors(response) {
 const HTML_ESCAPE_MAP = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;', '`': '&#96;' };
 
 function sanitiseAltText(raw) {
-	return String(raw ?? '')
-		.trim()
-		.replace(/<[^>]*>/g, '')                        // Remove any HTML tags
-		.replace(/[&<>"'`]/g, c => HTML_ESCAPE_MAP[c])  // Encode special characters
-		.slice(0, ALT_TEXT_MAX_LEN);
+  return String(raw ?? '')
+    .trim()
+    .replace(/<[^>]*>/g, '')                        // Remove any HTML tags
+    .replace(/[&<>"'`]/g, c => HTML_ESCAPE_MAP[c])  // Encode special characters
+    .slice(0, ALT_TEXT_MAX_LEN);
 }
 
 
 // ─── Entry point ──────────────────────────────────────────────────────────────
 export default {
-	async fetch(request, env, ctx) {
-		try {
-			return await router(request, env, ctx);
-		} catch (err) {
-			console.error('Unhandled error:', err);
-			return jsonError('Internal server error', 500);
-		}
-	},
+  async fetch(request, env, ctx) {
+    try {
+      return await router(request, env, ctx);
+    } catch (err) {
+      console.error('Unhandled error:', err);
+      return jsonError('Internal server error', 500);
+    }
+  },
 };
 
 async function router(request, env, ctx) {
-	// Respond to CORS preflight requests before any other processing.
-	if (request.method === 'OPTIONS') {
-		return new Response(null, { status: 204, headers: CORS_HEADERS });
-	}
+  // Respond to CORS preflight requests before any other processing.
+  if (request.method === 'OPTIONS') {
+    return new Response(null, { status: 204, headers: CORS_HEADERS });
+  }
 
-	const { pathname } = new URL(request.url);
+  const { pathname } = new URL(request.url);
 
-	// Health check endpoint — used by uptime monitors and deployment pipelines.
-	if (pathname === '/health') {
-		return new Response(JSON.stringify({ status: 'ok', ts: Date.now() }), {
-			status: 200,
-			headers: { 'Content-Type': 'application/json', ...CORS_HEADERS },
-		});
-	}
+  // Health check endpoint — used by uptime monitors and deployment pipelines.
+  if (pathname === '/health') {
+    return new Response(JSON.stringify({ status: 'ok', ts: Date.now() }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json', ...CORS_HEADERS },
+    });
+  }
 
-	// Apply rate limiting only to API endpoints, not the dashboard or static routes.
-	const rateLimitResponse = await rateLimit(request, env);
-	if (rateLimitResponse) return rateLimitResponse;
+  // Apply rate limiting only to API endpoints, not the dashboard or static routes.
+  const rateLimitResponse = await rateLimit(request, env);
+  if (rateLimitResponse) return rateLimitResponse;
 
-	if (pathname === '/') return handleRoot();
-	if (pathname === '/favicon.ico') return new Response(null, { status: 204 });
-	if (pathname === '/audit') return handleAudit(request, env);
-	if (pathname === '/upload') return handleUpload(request, env);
+  if (pathname === '/') return handleRoot();
+  if (pathname === '/favicon.ico') return new Response(null, { status: 204 });
+  if (pathname === '/audit') return handleAudit(request, env);
+  if (pathname === '/upload') return handleUpload(request, env);
 
-	const imageId = pathname.replace(/^\/images\/+/, '');
-	if (pathname.startsWith('/images/') && UUID_RE.test(imageId)) {
-		return handleImage(imageId, request, env, ctx);
-	}
+  const imageId = pathname.replace(/^\/images\/+/, '');
+  if (pathname.startsWith('/images/') && UUID_RE.test(imageId)) {
+    return handleImage(imageId, request, env, ctx);
+  }
 
-	return Response.json(
-		{ error: 'Not found', routes: ['GET /images/:uuid', 'POST /upload', 'GET /audit'] },
-		{ status: 404 }
-	);
+  return Response.json(
+    { error: 'Not found', routes: ['GET /images/:uuid', 'POST /upload', 'GET /audit'] },
+    { status: 404 }
+  );
 }
 
 // ─── Frontend dashboard ───────────────────────────────────────────────────────
 function handleRoot() {
-	const html = `<!DOCTYPE html>
+  const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -783,8 +783,9 @@ function handleRoot() {
   const authErr  = document.getElementById('auth-error');
   const tokenIn  = document.getElementById('token-input');
 
-  // Restore session on page load. sessionStorage survives a refresh but is cleared
-  // when the tab closes — appropriate for an admin token that should not persist indefinitely.
+  // Restore session on page load. sessionStorage survives a refresh but is cleared 
+  // when the tab closes. This is
+  appropriate for an admin token that should not persist indefinitely.
   const _saved = sessionStorage.getItem('iw_token');
   if (_saved) {
     TOKEN = _saved;
@@ -1121,251 +1122,251 @@ function handleRoot() {
 </body>
 </html>`;
 
-	return new Response(html, { headers: { 'Content-Type': 'text/html;charset=UTF-8' } });
+  return new Response(html, { headers: { 'Content-Type': 'text/html;charset=UTF-8' } });
 }
 
 // ─── Rate limiting (best-effort, fail-open) ───────────────────────────────────
 async function rateLimit(request, env) {
-	// Only apply rate limiting to API endpoints.
-	const { pathname } = new URL(request.url);
-	const isApiPath = pathname.startsWith('/images/') || pathname === '/upload' || pathname === '/audit';
-	if (!isApiPath) return null;
+  // Only apply rate limiting to API endpoints.
+  const { pathname } = new URL(request.url);
+  const isApiPath = pathname.startsWith('/images/') || pathname === '/upload' || pathname === '/audit';
+  if (!isApiPath) return null;
 
-	if (!env.RATE_LIMIT) return null;
+  if (!env.RATE_LIMIT) return null;
 
-	const ip = request.headers.get('CF-Connecting-IP') ?? 'anonymous';
-	const win = Math.floor(Date.now() / 60_000);
-	const key = `rl:${ip}:${win}`;
+  const ip = request.headers.get('CF-Connecting-IP') ?? 'anonymous';
+  const win = Math.floor(Date.now() / 60_000);
+  const key = `rl:${ip}:${win}`;
 
-	try {
-		const count = Number(await env.RATE_LIMIT.get(key) ?? 0);
-		if (count >= RATE_LIMIT_MAX) {
-			return new Response('Too Many Requests', {
-				status: 429,
-				headers: { 'Retry-After': '60', 'Content-Type': 'text/plain' },
-			});
-		}
-		await env.RATE_LIMIT.put(key, String(count + 1), { expirationTtl: RATE_LIMIT_TTL });
-	} catch (err) {
-		console.error('Rate-limit KV error:', err);
-	}
+  try {
+    const count = Number(await env.RATE_LIMIT.get(key) ?? 0);
+    if (count >= RATE_LIMIT_MAX) {
+      return new Response('Too Many Requests', {
+        status: 429,
+        headers: { 'Retry-After': '60', 'Content-Type': 'text/plain' },
+      });
+    }
+    await env.RATE_LIMIT.put(key, String(count + 1), { expirationTtl: RATE_LIMIT_TTL });
+  } catch (err) {
+    console.error('Rate-limit KV error:', err);
+  }
 
-	return null;
+  return null;
 }
 
 // ─── Auth helper ──────────────────────────────────────────────────────────────
 function requireBearer(request, env) {
-	if (!env.ADMIN_TOKEN) {
-		return jsonError('Server misconfiguration: ADMIN_TOKEN not set', 500);
-	}
-	/*
-	 * Production hardening (out of scope for this assignment):
-	 * - Rotate via `wrangler secret put ADMIN_TOKEN` — zero redeploy needed.
-	 * - For per-session tokens, store { token, expiresAt } in KV and verify on each request.
-	 * - Consider short-lived JWTs signed with a rotating KV-stored secret.
-	 */
-	const auth = request.headers.get('Authorization') ?? '';
-	if (auth !== `Bearer ${env.ADMIN_TOKEN}`) {
-		return new Response('Unauthorized', {
-			status: 401,
-			headers: { 'WWW-Authenticate': 'Bearer realm="image-worker"' },
-		});
-	}
-	return null;
+  if (!env.ADMIN_TOKEN) {
+    return jsonError('Server misconfiguration: ADMIN_TOKEN not set', 500);
+  }
+  /*
+   * Production hardening (out of scope for this assignment):
+   * - Rotate via `wrangler secret put ADMIN_TOKEN` — zero redeploy needed.
+   * - For per-session tokens, store { token, expiresAt } in KV and verify on each request.
+   * - Consider short-lived JWTs signed with a rotating KV-stored secret.
+   */
+  const auth = request.headers.get('Authorization') ?? '';
+  if (auth !== `Bearer ${env.ADMIN_TOKEN}`) {
+    return new Response('Unauthorized', {
+      status: 401,
+      headers: { 'WWW-Authenticate': 'Bearer realm="image-worker"' },
+    });
+  }
+  return null;
 }
 
 // ─── Image serve ──────────────────────────────────────────────────────────────
 async function handleImage(imageId, request, env, ctx) {
-	if (request.method !== 'GET') {
-		return new Response('Method Not Allowed', { status: 405, headers: { Allow: 'GET' } });
-	}
+  if (request.method !== 'GET') {
+    return new Response('Method Not Allowed', { status: 405, headers: { Allow: 'GET' } });
+  }
 
-	const cache = caches.default;
-	const cacheKey = new Request(request.url, { method: 'GET' });
+  const cache = caches.default;
+  const cacheKey = new Request(request.url, { method: 'GET' });
 
-	const cached = await cache.match(cacheKey);
-	if (cached) return cached;
+  const cached = await cache.match(cacheKey);
+  if (cached) return cached;
 
-	const [d1Result, r2Result] = await Promise.allSettled([
-		env.DB.prepare('SELECT alt_text FROM images WHERE id = ?').bind(imageId).first(),
-		env.IMAGES.get(imageId),
-	]);
+  const [d1Result, r2Result] = await Promise.allSettled([
+    env.DB.prepare('SELECT alt_text FROM images WHERE id = ?').bind(imageId).first(),
+    env.IMAGES.get(imageId),
+  ]);
 
-	if (r2Result.status === 'rejected') {
-		console.error('R2 error:', r2Result.reason);
-		return jsonError('Storage unavailable', 503);
-	}
+  if (r2Result.status === 'rejected') {
+    console.error('R2 error:', r2Result.reason);
+    return jsonError('Storage unavailable', 503);
+  }
 
-	const obj = r2Result.value;
-	if (!obj) return jsonError('Image not found', 404);
+  const obj = r2Result.value;
+  if (!obj) return jsonError('Image not found', 404);
 
-	if (d1Result.status === 'rejected') {
-		console.error('D1 read error (continuing without alt-text):', d1Result.reason);
-	}
+  if (d1Result.status === 'rejected') {
+    console.error('D1 read error (continuing without alt-text):', d1Result.reason);
+  }
 
-	const altText = d1Result.status === 'fulfilled' ? (d1Result.value?.alt_text ?? '') : '';
-	const imageBytes = await obj.arrayBuffer();
-	const contentType = obj.httpMetadata?.contentType ?? 'application/octet-stream';
+  const altText = d1Result.status === 'fulfilled' ? (d1Result.value?.alt_text ?? '') : '';
+  const imageBytes = await obj.arrayBuffer();
+  const contentType = obj.httpMetadata?.contentType ?? 'application/octet-stream';
 
-	const headers = new Headers({
-		'Content-Type': contentType,
-		'X-Alt-Text': altText || 'Pending — description being generated',
-		'Cache-Control': altText
-			? `public, max-age=${CACHE_MAX_AGE}`
-			: `public, max-age=${CACHE_PENDING_AGE}, stale-while-revalidate=300`,
-		'X-Image-Id': imageId,
-		// Expose headers that the dashboard JS needs to read.
-		'Access-Control-Allow-Origin': '*',
-		'Access-Control-Expose-Headers': 'X-Alt-Text, X-Image-Id, CF-Cache-Status, Cache-Control',
-	});
+  const headers = new Headers({
+    'Content-Type': contentType,
+    'X-Alt-Text': altText || 'Pending — description being generated',
+    'Cache-Control': altText
+      ? `public, max-age=${CACHE_MAX_AGE}`
+      : `public, max-age=${CACHE_PENDING_AGE}, stale-while-revalidate=300`,
+    'X-Image-Id': imageId,
+    // Expose headers that the dashboard JS needs to read.
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Expose-Headers': 'X-Alt-Text, X-Image-Id, CF-Cache-Status, Cache-Control',
+  });
 
-	const response = new Response(imageBytes, { status: 200, headers });
+  const response = new Response(imageBytes, { status: 200, headers });
 
-	if (altText) {
-		ctx.waitUntil(cache.put(cacheKey, response.clone()));
-	} else {
-		ctx.waitUntil(
-			generateAndCache(imageId, imageBytes, cacheKey, response.clone(), env, cache)
-		);
-	}
+  if (altText) {
+    ctx.waitUntil(cache.put(cacheKey, response.clone()));
+  } else {
+    ctx.waitUntil(
+      generateAndCache(imageId, imageBytes, cacheKey, response.clone(), env, cache)
+    );
+  }
 
-	return response;
+  return response;
 }
 
 // ─── Background: AI generation → cache rebuild ───────────────────────────────
 async function generateAndCache(imageId, imageBytes, cacheKey, response, env, cache) {
-	await generateAltTextOnce(imageId, imageBytes, env);
+  await generateAltTextOnce(imageId, imageBytes, env);
 
-	try {
-		const row = await env.DB
-			.prepare('SELECT alt_text FROM images WHERE id = ?')
-			.bind(imageId)
-			.first();
+  try {
+    const row = await env.DB
+      .prepare('SELECT alt_text FROM images WHERE id = ?')
+      .bind(imageId)
+      .first();
 
-		if (row?.alt_text) {
-			const enrichedHeaders = new Headers(response.headers);
-			enrichedHeaders.set('X-Alt-Text', row.alt_text);
-			enrichedHeaders.set('Cache-Control', `public, max-age=${CACHE_MAX_AGE}`);
+    if (row?.alt_text) {
+      const enrichedHeaders = new Headers(response.headers);
+      enrichedHeaders.set('X-Alt-Text', row.alt_text);
+      enrichedHeaders.set('Cache-Control', `public, max-age=${CACHE_MAX_AGE}`);
 
-			const body = await response.arrayBuffer();
-			await cache.put(cacheKey,
-				new Response(body, { status: 200, headers: enrichedHeaders })
-			);
-			return;
-		}
-	} catch (err) {
-		console.error('Post-AI cache rebuild failed:', err);
-	}
+      const body = await response.arrayBuffer();
+      await cache.put(cacheKey,
+        new Response(body, { status: 200, headers: enrichedHeaders })
+      );
+      return;
+    }
+  } catch (err) {
+    console.error('Post-AI cache rebuild failed:', err);
+  }
 
-	await cache.put(cacheKey, response);
+  await cache.put(cacheKey, response);
 }
 
 // ─── AI generation (idempotent, compute-efficient) ────────────────────────────
 async function generateAltTextOnce(imageId, imageBytes, env) {
-	if (env.AI_QUOTA) {
-		try {
-			const lockKey = `ai:${imageId}`;
-			const locked = await env.AI_QUOTA.get(lockKey);
-			if (locked) return;
-			await env.AI_QUOTA.put(lockKey, '1', { expirationTtl: AI_DEDUPE_TTL });
-		} catch (err) {
-			console.error('AI dedupe KV error:', err);
-		}
-	}
+  if (env.AI_QUOTA) {
+    try {
+      const lockKey = `ai:${imageId}`;
+      const locked = await env.AI_QUOTA.get(lockKey);
+      if (locked) return;
+      await env.AI_QUOTA.put(lockKey, '1', { expirationTtl: AI_DEDUPE_TTL });
+    } catch (err) {
+      console.error('AI dedupe KV error:', err);
+    }
+  }
 
-	try {
-		const result = await env.AI.run(VISION_MODEL, {
-			messages: [
-				{
-					role: 'system',
-					content: 'You are an accessibility assistant. Describe images concisely for use as alt-text.',
-				},
-				{
-					role: 'user',
-					content: 'Describe this image in one concise sentence suitable for use as alt-text.',
-				},
-			],
-			image: [...new Uint8Array(imageBytes)],
-		});
+  try {
+    const result = await env.AI.run(VISION_MODEL, {
+      messages: [
+        {
+          role: 'system',
+          content: 'You are an accessibility assistant. Describe images concisely for use as alt-text.',
+        },
+        {
+          role: 'user',
+          content: 'Describe this image in one concise sentence suitable for use as alt-text.',
+        },
+      ],
+      image: [...new Uint8Array(imageBytes)],
+    });
 
-		// Sanitise the model response before writing to the database.
-		const altText = sanitiseAltText(String(result?.response ?? '').trim());
+    // Sanitise the model response before writing to the database.
+    const altText = sanitiseAltText(String(result?.response ?? '').trim());
 
-		if (!altText) {
-			console.warn('AI returned empty description for:', imageId);
-			return;
-		}
+    if (!altText) {
+      console.warn('AI returned empty description for:', imageId);
+      return;
+    }
 
-		await env.DB
-			.prepare(`
+    await env.DB
+      .prepare(`
         INSERT INTO images (id, alt_text, updated_at)
         VALUES (?, ?, datetime('now'))
         ON CONFLICT(id) DO UPDATE SET
           alt_text   = excluded.alt_text,
           updated_at = excluded.updated_at
       `)
-			.bind(imageId, altText)
-			.run();
+      .bind(imageId, altText)
+      .run();
 
-	} catch (err) {
-		console.error('AI/D1 write failed for:', imageId, err);
-	}
+  } catch (err) {
+    console.error('AI/D1 write failed for:', imageId, err);
+  }
 }
 
 // ─── Audit endpoint ───────────────────────────────────────────────────────────
 async function handleAudit(request, env) {
-	if (request.method !== 'GET') {
-		return new Response('Method Not Allowed', { status: 405, headers: { Allow: 'GET' } });
-	}
+  if (request.method !== 'GET') {
+    return new Response('Method Not Allowed', { status: 405, headers: { Allow: 'GET' } });
+  }
 
-	const authError = requireBearer(request, env);
-	if (authError) return authError;
+  const authError = requireBearer(request, env);
+  if (authError) return authError;
 
-	try {
-		const url    = new URL(request.url);
-		const id     = url.searchParams.get('id') ?? null;
-		const limit  = Math.min(Number(url.searchParams.get('limit') ?? 50), 100);
-		const page   = Math.max(Number(url.searchParams.get('page') ?? 1), 1);
-		const offset = (page - 1) * limit;
+  try {
+    const url = new URL(request.url);
+    const id = url.searchParams.get('id') ?? null;
+    const limit = Math.min(Number(url.searchParams.get('limit') ?? 50), 100);
+    const page = Math.max(Number(url.searchParams.get('page') ?? 1), 1);
+    const offset = (page - 1) * limit;
 
-		// Single-record lookup used by the dashboard when polling for alt-text completion.
-		// Returns one row by ID rather than fetching a full page of results.
-		if (id) {
-			if (!UUID_RE.test(id)) return withCors(jsonError('Invalid id', 400));
-			const row = await env.DB
-				.prepare('SELECT id, source_url, alt_text, created_at, updated_at FROM images WHERE id = ?')
-				.bind(id)
-				.first();
-			return withCors(Response.json({
-				total: row ? 1 : 0,
-				page:  1,
-				limit: 1,
-				count: row ? 1 : 0,
-				data:  row ? [row] : [],
-			}));
-		}
+    // Single-record lookup used by the dashboard when polling for alt-text completion.
+    // Returns one row by ID rather than fetching a full page of results.
+    if (id) {
+      if (!UUID_RE.test(id)) return withCors(jsonError('Invalid id', 400));
+      const row = await env.DB
+        .prepare('SELECT id, source_url, alt_text, created_at, updated_at FROM images WHERE id = ?')
+        .bind(id)
+        .first();
+      return withCors(Response.json({
+        total: row ? 1 : 0,
+        page: 1,
+        limit: 1,
+        count: row ? 1 : 0,
+        data: row ? [row] : [],
+      }));
+    }
 
-		const [rows, total] = await Promise.all([
-			env.DB.prepare(`
+    const [rows, total] = await Promise.all([
+      env.DB.prepare(`
         SELECT id, source_url, alt_text, created_at, updated_at
         FROM   images
         ORDER  BY created_at DESC
         LIMIT  ? OFFSET ?
       `).bind(limit, offset).all(),
-			env.DB.prepare('SELECT COUNT(*) AS n FROM images').first(),
-		]);
+      env.DB.prepare('SELECT COUNT(*) AS n FROM images').first(),
+    ]);
 
-		return withCors(Response.json({
-			total: total?.n ?? 0,
-			page,
-			limit,
-			count: rows.results.length,
-			data:  rows.results,
-		}));
-	} catch (err) {
-		console.error('Audit query failed:', err);
-		return withCors(jsonError('Database unavailable', 503));
-	}
+    return withCors(Response.json({
+      total: total?.n ?? 0,
+      page,
+      limit,
+      count: rows.results.length,
+      data: rows.results,
+    }));
+  } catch (err) {
+    console.error('Audit query failed:', err);
+    return withCors(jsonError('Database unavailable', 503));
+  }
 }
 
 // ─── Upload endpoint ──────────────────────────────────────────────────────────
@@ -1381,7 +1382,7 @@ async function handleUpload(request, env) {
 	try {
 		body = await request.json();
 	} catch {
-		return jsonError('Invalid JSON — expected: {"url":"https://..."}', 400);
+		return jsonError('Invalid JSON — expected: {"url":"https://...", "description":"optional alt text"}', 400);
 	}
 
 	const sourceUrl = String(body?.url ?? '').trim();
@@ -1392,6 +1393,9 @@ async function handleUpload(request, env) {
 	if (!isSafeUrl(sourceUrl)) {
 		return withCors(jsonError('URL resolves to a disallowed network range', 400));
 	}
+
+	// Optional manual description — if provided, AI generation is skipped entirely
+	const manualAlt = sanitiseAltText(String(body?.description ?? '').trim());
 
 	try {
 		const existing = await env.DB
@@ -1417,7 +1421,7 @@ async function handleUpload(request, env) {
 	try {
 		imgResponse = await fetch(sourceUrl, {
 			signal: controller.signal,
-			headers: { 'User-Agent': 'Cloudflare-Worker-ImageUploador/1.0' },
+			headers: { 'User-Agent': 'Cloudflare-Worker-ImageWorker/1.0' },
 		});
 	} catch (err) {
 		return withCors(jsonError(`Failed to fetch source URL: ${err.message}`, 502));
@@ -1461,10 +1465,10 @@ async function handleUpload(request, env) {
 	try {
 		await env.DB
 			.prepare(`
-        INSERT INTO images (id, source_url, created_at)
-        VALUES (?, ?, datetime('now'))
-      `)
-			.bind(imageId, sourceUrl)
+				INSERT INTO images (id, source_url, alt_text, created_at)
+				VALUES (?, ?, ?, datetime('now'))
+			`)
+			.bind(imageId, sourceUrl, manualAlt || null)
 			.run();
 	} catch (err) {
 		console.error('D1 insert failed — rolling back R2:', err);
@@ -1473,7 +1477,13 @@ async function handleUpload(request, env) {
 	}
 
 	return withCors(Response.json(
-		{ imageId, url: `/images/${imageId}`, message: 'Image uploaded — alt-text will generate on first access' },
+		{
+			imageId,
+			url: `/images/${imageId}`,
+			message: manualAlt
+				? 'Image uploaded — alt-text set from description'
+				: 'Image uploaded — alt-text will generate on first access',
+		},
 		{ status: 201 }
 	));
 }
@@ -1483,20 +1493,20 @@ async function handleUpload(request, env) {
 // outbound fetch is made. Cloudflare's infrastructure enforces similar restrictions
 // at the network level; this check makes the policy explicit in application code.
 function isSafeUrl(urlStr) {
-	try {
-		const { hostname } = new URL(urlStr);
-		if (/^(localhost|127\.|0\.0\.0\.0|::1)/i.test(hostname))  return false; // loopback
-		if (/^169\.254\./i.test(hostname))                          return false; // link-local / cloud metadata
-		if (/^10\./i.test(hostname))                                 return false; // RFC1918 class A
-		if (/^172\.(1[6-9]|2\d|3[01])\./i.test(hostname))          return false; // RFC1918 class B
-		if (/^192\.168\./i.test(hostname))                          return false; // RFC1918 class C
-		return true;
-	} catch {
-		return false;
-	}
+  try {
+    const { hostname } = new URL(urlStr);
+    if (/^(localhost|127\.|0\.0\.0\.0|::1)/i.test(hostname)) return false; // loopback
+    if (/^169\.254\./i.test(hostname)) return false; // link-local / cloud metadata
+    if (/^10\./i.test(hostname)) return false; // RFC1918 class A
+    if (/^172\.(1[6-9]|2\d|3[01])\./i.test(hostname)) return false; // RFC1918 class B
+    if (/^192\.168\./i.test(hostname)) return false; // RFC1918 class C
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function jsonError(message, status) {
-	return Response.json({ error: message }, { status });
+  return Response.json({ error: message }, { status });
 }
