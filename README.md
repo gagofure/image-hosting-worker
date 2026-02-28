@@ -50,7 +50,7 @@ AI inference only runs when an image is first requested and alt-text has not yet
 
 ## Prerequisites
 
-- A [Cloudflare account](https://dash.cloudflare.com/sign-up) (free tier is sufficient)
+- A [Cloudflare account](https://dash.cloudflare.com/sign-up) (free tier is sufficient, you must add a card to use D1)
 - [Node.js](https://nodejs.org/) v18+
 - [Wrangler CLI](https://developers.cloudflare.com/workers/wrangler/install-and-update/)
 
@@ -73,22 +73,22 @@ wragler whoami
 ### 1. Clone the Repository
 
 ```bash
-git clone <your-repo-url>
-cd image-worker
+git clone https://github.com/gagofure/image-hosting-worker
+cd image-hosting-worker
 ```
 
 ### 2. Create Cloudflare Resources
 
 **R2 Bucket**
 ```bash
-wrangler r2 bucket create image-worker-images
+wrangler r2 bucket create image-worker-store
 ```
 
 **D1 Database**
 ```bash
 wrangler d1 create image-worker-db
 ```
-Copy the `database_id` from the output — you'll need it for `wrangler.toml`.
+Copy the `database_id` from the output — you'll need it for `wrangler.jsonc`.
 
 **KV Namespaces**
 ```bash
@@ -151,14 +151,7 @@ wrangler d1 execute image-worker-db --command "
 "
 ```
 
-### 5. Set the Admin Token
-
-```bash
-wrangler secret put ADMIN_TOKEN
-# Enter a strong, randomly generated token when prompted
-```
-
-### 6. Accept the Vision Model License
+### 5. Accept the Vision Model License
 
 Workers AI requires a one-time licence acceptance for the Llama vision model before it can be used. Send one request with `{ "prompt": "agree" }` to the model via the Cloudflare Dashboard AI playground, or follow the prompt in the [official docs](https://developers.cloudflare.com/workers-ai/models/llama-3.2-11b-vision-instruct/). you can use the script below to accept
 
@@ -171,10 +164,18 @@ curl https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/ai/run
 
 ```
 
-### 7. Deploy
+### 6. Deploy
 
 ```bash
 wrangler deploy
+```
+
+
+### 7. Set the Admin Token
+
+```bash
+wrangler secret put ADMIN_TOKEN
+# Enter a strong, randomly generated token when prompted
 ```
 
 ---
@@ -333,4 +334,4 @@ Together these three layers form a cost funnel: the Cache API eliminates the vas
 ---
 ## Author
 
-**Ogaga Agofure** — Cloud & Infrastructure Engineer
+**Ogaga Agofure**
