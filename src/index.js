@@ -27,14 +27,14 @@
 // ─── Constants ────────────────────────────────────────────────────────────────
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024; // 10MB limit for uploaded images
 const RATE_LIMIT_MAX = 100; // Max 100 requests per TTL per IP address
-const RATE_LIMIT_TTL = 75;  //	Rate limit window in seconds (slightly above 1 minute to account for clock skew)
+const RATE_LIMIT_TTL = 75;  // Rate limit window in seconds (slightly above 1 minute to account for clock skew)
 const AI_DEDUPE_TTL = 300; // Time in seconds to consider an alt-text generation "in-flight" for deduplication
 const CACHE_MAX_AGE = 3600;   // Cache alt-text for 1 hour at the edge to speed up repeat requests without hitting the model again
 const CACHE_PENDING_AGE = 60; // Cache "pending" status for 1 minute to prevent thundering herd of requests hitting the model when alt-text is being generated
 const ALT_TEXT_MAX_LEN = 500; // Truncate alt-text to 500 characters to prevent abuse and control storage costs
 const VISION_MODEL = '@cf/meta/llama-3.2-11b-vision-instruct'; // Workers AI model identifier. Change if you want to use a different vision model from the registry.
 const ALLOWED_TYPES = new Set([
-  'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/avif', //  image formats allowed for upload
+  'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/avif', // image formats allowed for upload
 ]);
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i; // Simple regex to validate UUIDs in image IDs and prevent path traversal
 
@@ -208,6 +208,25 @@ function handleRoot() {
 
     input:focus { border-color: var(--accent); }
 
+    textarea {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-family: var(--mono);
+      font-size: 0.85rem;
+      padding: 0.65rem 0.9rem;
+      outline: none;
+      resize: vertical;
+      min-height: 80px;
+      transition: border-color 0.2s;
+      margin-top: 0.75rem;
+    }
+
+    textarea:focus { border-color: var(--accent); }
+
+    textarea::placeholder { color: var(--muted); }
+
     button {
       cursor: pointer;
       font-family: var(--sans);
@@ -333,6 +352,15 @@ function handleRoot() {
       color: var(--muted);
       margin-bottom: 1.5rem;
       line-height: 1.6;
+    }
+
+    .upload-hint {
+      font-family: var(--mono);
+      font-size: 0.72rem;
+      color: var(--muted);
+      margin-top: 0.4rem;
+      margin-bottom: 0;
+      line-height: 1.5;
     }
 
     .upload-result {
@@ -696,8 +724,10 @@ function handleRoot() {
     <div class="panel active" id="panel-upload">
       <div class="upload-card">
         <h2>Upload Image</h2>
-        <p>Paste a public image URL. It'll be stored in R2 and alt-text generated lazily on first view.</p>
+        <p>Paste a public image URL. Optionally add a description — or leave it blank and AI will generate one automatically on first access.</p>
         <input type="url" id="upload-url" placeholder="https://example.com/image.jpg" />
+        <textarea id="upload-desc" placeholder="Optional: describe the image to skip AI generation..."></textarea>
+        <p class="upload-hint">Leave blank to let AI generate the description on first access.</p>
         <button class="btn-primary" id="upload-btn">Upload Image</button>
         <div class="upload-result" id="upload-result"></div>
       </div>
@@ -783,7 +813,7 @@ function handleRoot() {
   const authErr  = document.getElementById('auth-error');
   const tokenIn  = document.getElementById('token-input');
 
-   // Restore session on page load. sessionStorage survives a refresh but is cleared
+  // Restore session on page load. sessionStorage survives a refresh but is cleared
   // when the tab closes. This is appropriate for an admin token that should not persist indefinitely.
   const _saved = sessionStorage.getItem('iw_token');
   if (_saved) {
@@ -851,13 +881,15 @@ function handleRoot() {
   // ── Upload ──
   const uploadBtn    = document.getElementById('upload-btn');
   const uploadUrl    = document.getElementById('upload-url');
+  const uploadDesc   = document.getElementById('upload-desc');
   const uploadResult = document.getElementById('upload-result');
 
   uploadUrl.addEventListener('keydown', e => { if (e.key === 'Enter') doUpload(); });
   uploadBtn.addEventListener('click', doUpload);
 
   async function doUpload() {
-    const url = uploadUrl.value.trim();
+    const url  = uploadUrl.value.trim();
+    const desc = uploadDesc.value.trim();
     if (!url) return;
     uploadBtn.disabled = true;
     uploadBtn.innerHTML = '<span class="spinner"></span>Uploading...';
@@ -865,10 +897,10 @@ function handleRoot() {
     uploadResult.className = 'upload-result';
 
     try {
-      const res  = await fetch('/upload', {
+      const res = await fetch('/upload', {
         method:  'POST',
         headers: { Authorization: 'Bearer ' + TOKEN, 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ url }),
+        body:    JSON.stringify({ url, ...(desc && { description: desc }) }),
       });
       const data = await res.json();
 
@@ -880,7 +912,8 @@ function handleRoot() {
           (data.message ?? 'Uploaded') + '\\n' +
           'ID: ' + data.imageId + '\\n' +
           'URL: ' + window.location.origin + data.url;
-        uploadUrl.value = '';
+        uploadUrl.value  = '';
+        uploadDesc.value = '';
       }
     } catch (err) {
       uploadResult.classList.add('error');
@@ -967,8 +1000,7 @@ function handleRoot() {
     empty.style.display = 'none';
 
     try {
-      const offset = (page - 1) * LIMIT;
-      const res    = await fetch(\`/audit?limit=\${LIMIT}&page=\${page}\`, {
+      const res = await fetch(\`/audit?limit=\${LIMIT}&page=\${page}\`, {
         headers: { Authorization: 'Bearer ' + TOKEN }
       });
       const data = await res.json();
@@ -1393,7 +1425,7 @@ async function handleUpload(request, env) {
     return withCors(jsonError('URL resolves to a disallowed network range', 400));
   }
 
-  // If description is provided, AI generation is skipped entirely
+  // Optional manual description — if provided, AI generation is skipped entirely
   const manualAlt = sanitiseAltText(String(body?.description ?? '').trim());
 
   try {
@@ -1464,9 +1496,9 @@ async function handleUpload(request, env) {
   try {
     await env.DB
       .prepare(`
-				INSERT INTO images (id, source_url, alt_text, created_at)
-				VALUES (?, ?, ?, datetime('now'))
-			`)
+        INSERT INTO images (id, source_url, alt_text, created_at)
+        VALUES (?, ?, ?, datetime('now'))
+      `)
       .bind(imageId, sourceUrl, manualAlt || null)
       .run();
   } catch (err) {
