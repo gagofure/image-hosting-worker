@@ -908,10 +908,31 @@ function handleRoot() {
         uploadResult.classList.add('error');
         uploadResult.textContent = 'Error ' + res.status + ': ' + (data.error ?? 'Unknown error');
       } else {
-        uploadResult.textContent =
-          (data.message ?? 'Uploaded') + '\\n' +
-          'ID: ' + data.imageId + '\\n' +
-          'URL: ' + window.location.origin + data.url;
+        uploadResult.innerHTML = '';
+
+        const rows = [
+          { label: 'Status',   value: data.message ?? 'Uploaded' },
+          { label: 'Image ID', value: data.imageId },
+          { label: 'URL',      value: window.location.origin + data.url },
+        ];
+
+        rows.forEach(({ label, value }) => {
+          const row = document.createElement('div');
+          row.style.cssText = 'display:flex;gap:0.75rem;margin-bottom:0.35rem;align-items:baseline;';
+
+          const l = document.createElement('span');
+          l.style.cssText = 'font-size:0.65rem;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);min-width:64px;flex-shrink:0;';
+          l.textContent = label;
+
+          const v = document.createElement('span');
+          v.style.cssText = 'color:var(--text);word-break:break-all;';
+          v.textContent = value;
+
+          row.appendChild(l);
+          row.appendChild(v);
+          uploadResult.appendChild(row);
+        });
+
         uploadUrl.value  = '';
         uploadDesc.value = '';
       }
