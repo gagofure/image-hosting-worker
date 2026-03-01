@@ -663,6 +663,41 @@ function handleRoot() {
       border-left: 3px solid var(--accent);
     }
 
+    .btn-copy {
+      margin-top: 0.5rem;
+      background: var(--border);
+      color: var(--text);
+      font-family: var(--sans);
+      font-size: 0.68rem;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      border: none;
+      padding: 0.35rem 0.85rem;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    .btn-copy:hover { background: #2a2a28; }
+
+    .copy-confirm {
+      font-family: var(--mono);
+      font-size: 0.68rem;
+      color: var(--accent2);
+      margin-left: 0.6rem;
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+
+    .copy-confirm.show { opacity: 1; }
+
+    .info-value-secondary {
+      font-size: 0.72rem;
+      color: var(--muted);
+      word-break: break-all;
+      font-family: var(--mono);
+    }
+
     /* ── EMPTY / LOADING ── */
     .empty-state {
       text-align: center;
@@ -785,8 +820,14 @@ function handleRoot() {
         <div class="info-value" id="modal-id"></div>
       </div>
       <div>
+        <div class="info-label">Image URL</div>
+        <div class="info-value" id="modal-image-url"></div>
+        <button class="btn-copy" id="modal-copy-btn">Copy URL</button>
+        <span class="copy-confirm" id="copy-confirm">Copied!</span>
+      </div>
+      <div style="margin-top:0.75rem">
         <div class="info-label">Source URL</div>
-        <div class="info-value" id="modal-url"></div>
+        <div class="info-value info-value-secondary" id="modal-url"></div>
       </div>
       <div>
         <div class="info-label">Alt Text</div>
@@ -1086,6 +1127,8 @@ function handleRoot() {
 
   // ── Modal ──
   function openModal(row) {
+    const imageUrl = window.location.origin + '/images/' + row.id;
+
     document.getElementById('modal-img').src  = '/images/' + row.id;
     document.getElementById('modal-img').alt  = row.alt_text ?? '';
     document.getElementById('modal-id').textContent   = row.id;
@@ -1093,14 +1136,35 @@ function handleRoot() {
     document.getElementById('modal-alt').textContent  = row.alt_text
       ?? 'Generating alt-text… this updates automatically.';
 
+    // Image URL — clickable link + copy button
+    const imageUrlEl = document.getElementById('modal-image-url');
+    const imgLink = document.createElement('a');
+    imgLink.href        = imageUrl;
+    imgLink.target      = '_blank';
+    imgLink.rel         = 'noopener';
+    imgLink.textContent = imageUrl;
+    imageUrlEl.innerHTML = '';
+    imageUrlEl.appendChild(imgLink);
+
+    // Copy button
+    const copyBtn = document.getElementById('modal-copy-btn');
+    copyBtn.onclick = () => {
+      navigator.clipboard.writeText(imageUrl).then(() => {
+        const confirm = document.getElementById('copy-confirm');
+        confirm.classList.add('show');
+        setTimeout(() => confirm.classList.remove('show'), 1500);
+      });
+    };
+
+    // Source URL — secondary, opens in new tab
     const urlEl = document.getElementById('modal-url');
-    // Build the anchor element via DOM so the URL is never interpreted as markup.
     if (row.source_url) {
       const a = document.createElement('a');
       a.href        = row.source_url;
       a.target      = '_blank';
       a.rel         = 'noopener';
       a.textContent = row.source_url;
+      a.style.color = 'var(--muted)';
       urlEl.innerHTML = '';
       urlEl.appendChild(a);
     } else {

@@ -6,7 +6,7 @@
 
 ImageWorker is an AI-powered image hosting service built entirely on Cloudflare's developer platform. It accepts image URLs via a REST API, stores the image bytes privately in R2, and automatically generates accessibility descriptions (alt-text) using a vision LLM — lazily, on first access, never at upload time.
 
-The service is deployed as a single Cloudflare Worker with no external dependencies at runtime. All storage, inference, caching, and rate limiting are handled by Cloudflare-native primitives, making the system globally distributed by default with no infrastructure to manage.
+The service is deployed as a single Cloudflare Worker with no external dependencies at runtime. All storage, inference, caching, and rate limiting are handled by Cloudflare-native primitives, making the system globally distributed by default with no infrastructure to manage. A custom domain is served behind Cloudflare DNS, ensuring production-grade routing, full Cache API behavior at the edge, and an additional layer of network protection
 
 ---
 
@@ -113,7 +113,7 @@ Rate limiting and AI deduplication are separated into two KV namespaces intentio
 8. Respond       201 with imageId and relative URL
 ```
 
-If D1 insert fails after a successful R2 write, a compensating `R2.delete()` is attempted to prevent orphaned objects. This is best-effort — the delete is fire-and-forget and logged on failure.
+If D1 insert fails after a successful R2 write, a compensating `R2.delete()` is attempted to prevent orphaned objects. This is best-effort, the delete is fire-and-forget and logged on failure.
 
 ### Image Serve — `GET /images/:uuid`
 
@@ -154,7 +154,7 @@ CREATE UNIQUE INDEX idx_images_source_url
 
 The `UNIQUE` constraint on `source_url` enforces deduplication at the database level, independently of the application-layer check. The application check is a fast-path optimisation; the index is the invariant guarantee.
 
-The `alt_text` column being nullable is load-bearing — a `NULL` value is the signal that triggers AI generation. It is not an oversight; it is the state machine.
+The `alt_text` column being nullable is load-bearing — a `NULL` value is the signal that triggers AI generation. It is not an oversight; it is the state machine ( a system that behaves differently depending on what state it's in. Your Worker reads that column and makes a decision ).
 
 ---
 
@@ -192,7 +192,7 @@ A sliding window of 100 requests per minute per IP is enforced via KV. The limit
 | Alt-text pending | `public, max-age=60, stale-while-revalidate=300` | Short-lived entry; rebuilt after AI completes |
 | Cache hit | — | Served from edge, zero Worker invocation |
 
-The `stale-while-revalidate=300` directive on pending responses allows the edge to serve the stale (pending) response for up to 5 minutes while revalidation happens in the background. This prevents a thundering herd from hitting the Worker simultaneously when the 60-second TTL expires on a cold image.
+The `stale-while-revalidate=300` directive on pending responses allows the edge to serve the stale (pending) response for up to 5 minutes while revalidation happens in the background. This prevents a thundering herd (A thundering herd is when a large number of requests all hit your system at the same time for the same resource, overwhelming it) from hitting the Worker simultaneously when the 60-second TTL expires on a cold image.
 
 Cache writes always use `ctx.waitUntil()` — they happen after the response is returned to the client, adding zero latency to the request.
 
