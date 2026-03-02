@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <title>ImageWorker — System Sequence Diagram</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inconsolata:wght@400;500;600&family=Syne:wght@600;700&display=swap');
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background: #0a0a09;
+            color: #ede8df;
+            font-family: 'Inconsolata', monospace;
+            padding: 3rem 2rem;
+            min-height: 100vh;
+        }
+
+        h1 {
+            font-family: 'Syne', sans-serif;
+            font-size: 1rem;
+            font-weight: 700;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: #e8f54d;
+            margin-bottom: 0.4rem;
+        }
+
+        .subtitle {
+            font-size: 0.75rem;
+            color: #6b6860;
+            margin-bottom: 3rem;
+            letter-spacing: 0.04em;
+        }
+
+        svg {
+            display: block;
+            max-width: 100%;
+            overflow: visible;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>ImageWorker — Sequence Diagram</h1>
+    <p class="subtitle">Exact code flow · POST /upload and GET /images/:uuid</p>
+
+    <svg viewBox="0 0 1100 1580" width="1100" xmlns="http://www.w3.org/2000/svg" font-family="Inconsolata, monospace"
+        font-size="11">
+
+        <defs>
+            <marker id="arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+                <polygon points="0 0, 8 3, 0 6" fill="#6b6860" />
+            </marker>
+            <marker id="arr-accent" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+                <polygon points="0 0, 8 3, 0 6" fill="#e8f54d" />
+            </marker>
+            <marker id="arr-green" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+                <polygon points="0 0, 8 3, 0 6" fill="#4df4a0" />
+            </marker>
+            <marker id="arr-red" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+                <polygon points="0 0, 8 3, 0 6" fill="#f4604d" />
+            </marker>
+            <marker id="arr-muted" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+                <polygon points="0 0, 8 3, 0 6" fill="#444440" />
+            </marker>
+        </defs>
+
+        <!-- ── Column definitions ── -->
+        <!-- Client=80, Worker=230, Cache=380, R2=510, D1=640, KV=780, AI=930 -->
+
+        <!-- ── ACTOR BOXES (top) ── -->
+        <g font-family="Syne, sans-serif" font-weight="700" font-size="11.5" letter-spacing="0.06em">
+            <!-- Client -->
+            <rect x="30" y="10" width="100" height="32" rx="2" fill="#111110" stroke="#222220" stroke-width="1" />
+            <text x="80" y="31" text-anchor="middle" fill="#ede8df">CLIENT</text>
+
+            <!-- Worker -->
+            <rect x="180" y="10" width="100" height="32" rx="2" fill="#111110" stroke="#e8f54d" stroke-width="1" />
+            <text x="230" y="31" text-anchor="middle" fill="#e8f54d">WORKER</text>
+
+            <!-- Cache -->
+            <rect x="330" y="10" width="100" height="32" rx="2" fill="#111110" stroke="#222220" stroke-width="1" />
+            <text x="380" y="31" text-anchor="middle" fill="#ede8df">CACHE API</text>
+
+            <!-- R2 -->
+            <rect x="460" y="10" width="100" height="32" rx="2" fill="#111110" stroke="#222220" stroke-width="1" />
+            <text x="510" y="31" text-anchor="middle" fill="#ede8df">R2</text>
+
+            <!-- D1 -->
+            <rect x="590" y="10" width="100" height="32" rx="2" fill="#111110" stroke="#222220" stroke-width="1" />
+            <text x="640" y="31" text-anchor="middle" fill="#ede8df">D1</text>
+
+            <!-- KV -->
+            <rect x="730" y="10" width="100" height="32" rx="2" fill="#111110" stroke="#222220" stroke-width="1" />
+            <text x="780" y="31" text-anchor="middle" fill="#ede8df">KV STORE</text>
+
+            <!-- AI -->
+            <rect x="880" y="10" width="100" height="32" rx="2" fill="#111110" stroke="#222220" stroke-width="1" />
+            <text x="930" y="31" text-anchor="middle" fill="#ede8df">WORKERS AI</text>
+        </g>
+
+        <!-- ── LIFELINES ── -->
+        <g stroke="#1e1e1c" stroke-width="1" stroke-dasharray="4,4">
+            <line x1="80" y1="42" x2="80" y2="1540" />
+            <line x1="230" y1="42" x2="230" y2="1540" />
+            <line x1="380" y1="42" x2="380" y2="1540" />
+            <line x1="510" y1="42" x2="510" y2="1540" />
+            <line x1="640" y1="42" x2="640" y2="1540" />
+            <line x1="780" y1="42" x2="780" y2="1540" />
+            <line x1="930" y1="42" x2="930" y2="1540" />
+        </g>
+
+        <!-- ═══════════════════════════════════════════════════════ -->
+        <!-- SECTION A: POST /upload                                 -->
+        <!-- ═══════════════════════════════════════════════════════ -->
+
+        <!-- Section label -->
+        <rect x="30" y="55" width="960" height="22" rx="2" fill="#161614" />
+        <text x="45" y="70" fill="#e8f54d" font-family="Syne,sans-serif" font-weight="700" font-size="10"
+            letter-spacing="0.1em">POST /upload</text>
+
+        <!-- Step 1: Client → Worker: POST /upload {url, description?} -->
+        <line x1="88" y1="95" x2="222" y2="95" stroke="#6b6860" stroke-width="1.2" marker-end="url(#arr)" />
+        <text x="148" y="89" text-anchor="middle" fill="#ede8df" font-size="10">POST /upload &#123;url,
+            description?&#125;</text>
+        <circle cx="80" cy="95" r="9" fill="#0a0a09" stroke="#6b6860" stroke-width="1" />
+        <text x="80" y="99" text-anchor="middle" fill="#6b6860" font-size="9">1</text>
+
+        <!-- Step 2: Worker → KV: Check rate limit (ip:window key) -->
+        <line x1="238" y1="115" x2="772" y2="115" stroke="#6b6860" stroke-width="1.2" marker-end="url(#arr)" />
+        <text x="505" y="109" text-anchor="middle" fill="#ede8df" font-size="10">RATE_LIMIT.get(ip:window)</text>
+        <circle cx="230" cy="115" r="9" fill="#0a0a09" stroke="#6b6860" stroke-width="1" />
+        <text x="230" y="119" text-anchor="middle" fill="#6b6860" font-size="9">2</text>
+
+        <!-- Step 2 return: KV → Worker -->
+        <line x1="772" y1="130" x2="238" y2="130" stroke="#444440" stroke-width="1" stroke-dasharray="4,3"
+            marker-end="url(#arr-muted)" />
+        <text x="505" y="125" text-anchor="middle" fill="#6b6860" font-size="9">count / 429 if exceeded</text>
+
+        <!-- Step 3: Worker → KV: Increment counter -->
+        <line x1="238" y1="148" x2="772" y2="148" stroke="#6b6860" stroke-width="1.2" marker-end="url(#arr)" />
+        <text x="505" y="142" text-anchor="middle" fill="#ede8df" font-size="10">RATE_LIMIT.put(key, count+1,
+            ttl=75s)</text>
+
+        <!-- Step 4: Auth check (internal Worker note) -->
+        <rect x="178" y="160" width="104" height="18" rx="1" fill="#1a1a10" stroke="#3a3a10" stroke-width="0.8" />
+        <text x="230" y="173" text-anchor="middle" fill="#e8f54d" font-size="9">requireBearer() → 401</text>
+
+        <!-- Step 5: Worker → D1: Dedup check on source_url -->
+        <line x1="238" y1="192" x2="632" y2="192" stroke="#6b6860" stroke-width="1.2" marker-end="url(#arr)" />
+        <text x="435" y="186" text-anchor="middle" fill="#ede8df" font-size="10">SELECT id WHERE source_url = ?</text>
+        <circle cx="230" cy="192" r="9" fill="#0a0a09" stroke="#6b6860" stroke-width="1" />
+        <text x="230" y="196" text-anchor="middle" fill="#6b6860" font-size="9">3</text>
+
+        <!-- Alt branch: already exists -->
+        <rect x="30" y="205" width="960" height="46" rx="1" fill="#0f0f0e" stroke="#222220" stroke-width="0.8" />
+        <text x="45" y="220" fill="#6b6860" font-size="9" font-style="italic">alt: already exists</text>
+        <line x1="632" y1="228" x2="88" y2="228" stroke="#444440" stroke-width="1" stroke-dasharray="4,3"
+            marker-end="url(#arr-muted)" />
+        <text x="360" y="222" text-anchor="middle" fill="#6b6860" font-size="9">200 &#123;imageId, url, "Already
+            uploaded"&#125;</text>
+
+        <!-- Step 5b: SSRF check (internal note) -->
+        <rect x="178" y="258" width="104" height="18" rx="1" fill="#1a1a10" stroke="#3a3a10" stroke-width="0.8" />
+        <text x="230" y="271" text-anchor="middle" fill="#e8f54d" font-size="9">isSafeUrl() → 400 if blocked</text>
+
+        <!-- Step 6: Worker fetches external image (outbound) -->
+        <line x1="238" y1="288" x2="960" y2="288" stroke="#6b6860" stroke-width="1" stroke-dasharray="2,2"
+            marker-end="url(#arr)" />
+        <text x="600" y="282" text-anchor="middle" fill="#ede8df" font-size="10">fetch(sourceUrl, &#123;signal:
+            AbortController 10s&#125;)</text>
+        <circle cx="230" cy="288" r="9" fill="#0a0a09" stroke="#6b6860" stroke-width="1" />
+        <text x="230" y="292" text-anchor="middle" fill="#6b6860" font-size="9">4</text>
+        <text x="990" y="292" fill="#6b6860" font-size="9">external</text>
+
+        <!-- Validate MIME + size note -->
+        <rect x="178" y="300" width="104" height="18" rx="1" fill="#1a1a10" stroke="#3a3a10" stroke-width="0.8" />
+        <text x="230" y="313" text-anchor="middle" fill="#e8f54d" font-size="9">validate MIME + size ≤10MB</text>
+
+        <!-- Step 7: Worker → R2: put(uuid, bytes) -->
+        <line x1="238" y1="332" x2="502" y2="332" stroke="#6b6860" stroke-width="1.2" marker-end="url(#arr)" />
+        <text x="370" y="326" text-anchor="middle" fill="#ede8df" font-size="10">R2.put(uuid, bytes,
+            &#123;contentType&#125;)</text>
+        <circle cx="230" cy="332" r="9" fill="#0a0a09" stroke="#6b6860" stroke-width="1" />
+        <text x="230" y="336" text-anchor="middle" fill="#6b6860" font-size="9">5</text>
+
+        <!-- Step 8: Worker → D1: INSERT images (id, source_url, alt_text=NULL or manual) -->
+        <line x1="238" y1="352" x2="632" y2="352" stroke="#6b6860" stroke-width="1.2" marker-end="url(#arr)" />
+        <text x="435" y="346" text-anchor="middle" fill="#ede8df" font-size="10">INSERT (id, source_url, alt_text=NULL
+            or description)</text>
+        <circle cx="230" cy="352" r="9" fill="#0a0a09" stroke="#6b6860" stroke-width="1" />
+        <text x="230" y="356" text-anchor="middle" fill="#6b6860" font-size="9">6</text>
+
+        <!-- D1 fail branch: rollback R2 -->
+        <rect x="30" y="362" width="960" height="30" rx="1" fill="#1a0d0d" stroke="#3a1010" stroke-width="0.8" />
+        <text x="45" y="374" fill="#f4604d" font-size="9" font-style="italic">alt: D1 insert fails → R2.delete(uuid)
+            best-effort rollback → 503</text>
+
+        <!-- Step 9: Worker → Client: 201 response -->
+        <line x1="222" y1="407" x2="88" y2="407" stroke="#4df4a0" stroke-width="1.5" marker-end="url(#arr-green)" />
+        <text x="148" y="400" text-anchor="middle" fill="#4df4a0" font-size="10">201 &#123;imageId, url,
+            message&#125;</text>
+        <circle cx="230" cy="407" r="9" fill="#0a0a09" stroke="#4df4a0" stroke-width="1.2" />
+        <text x="230" y="411" text-anchor="middle" fill="#4df4a0" font-size="9">7</text>
+
+        <!-- ═══════════════════════════════════════════════════════ -->
+        <!-- SECTION B: GET /images/:uuid                           -->
+        <!-- ═══════════════════════════════════════════════════════ -->
+
+        <rect x="30" y="435" width="960" height="22" rx="2" fill="#161614" />
+        <text x="45" y="450" fill="#e8f54d" font-family="Syne,sans-serif" font-weight="700" font-size="10"
+            letter-spacing="0.1em">GET /images/:uuid</text>
+
+        <!-- Step 1: Client → Worker -->
+        <line x1="88" y1="475" x2="222" y2="475" stroke="#6b6860" stroke-width="1.2" marker-end="url(#arr)" />
+        <text x="148" y="469" text-anchor="middle" fill="#ede8df" font-size="10">GET /images/:uuid</text>
+        <circle cx="80" cy="475" r="9" fill="#0a0a09" stroke="#6b6860" stroke-width="1" />
+        <text x="80" y="479" text-anchor="middle" fill="#6b6860" font-size="9">1</text>
+
+        <!-- Rate limit check -->
+        <line x1="238" y1="493" x2="772" y2="493" stroke="#6b6860" stroke-width="1.2" marker-end="url(#arr)" />
+        <text x="505" y="487" text-anchor="middle" fill="#ede8df" font-size="10">RATE_LIMIT.get / .put (same as
+            upload)</text>
+        <circle cx="230" cy="493" r="9" fill="#0a0a09" stroke="#6b6860" stroke-width="1" />
+        <text x="230" y="497" text-anchor="middle" fill="#6b6860" font-size="9">2</text>
+
+        <!-- Step 3: Cache check -->
+        <line x1="238" y1="515" x2="372" y2="515" stroke="#6b6860" stroke-width="1.2" marker-end="url(#arr)" />
+        <text x="305" y="509" text-anchor="middle" fill="#ede8df" font-size="10">caches.default.match(url)</text>
+        <circle cx="230" cy="515" r="9" fill="#0a0a09" stroke="#6b6860" stroke-width="1" />
+        <text x="230" y="519" text-anchor="middle" fill="#6b6860" font-size="9">3</text>
+
+        <!-- ── CACHE HIT BRANCH ── -->
+        <rect x="30" y="528" width="960" height="44" rx="1" fill="#0d1a12" stroke="#103a20" stroke-width="0.8" />
+        <text x="45" y="541" fill="#4df4a0" font-size="9" font-style="italic">alt: CACHE HIT — zero Worker compute, zero
+            R2/D1/AI</text>
+        <line x1="372" y1="558" x2="88" y2="558" stroke="#4df4a0" stroke-width="1.5" marker-end="url(#arr-green)" />
+        <text x="230" y="552" text-anchor="middle" fill="#4df4a0" font-size="10">200 image + X-Alt-Text + X-Image-Id
+            (from edge)</text>
+
+        <!-- ── CACHE MISS PATH ── -->
+        <text x="45" y="590" fill="#6b6860" font-size="9" font-style="italic">cache miss →</text>
+
+        <!-- Step 4: Promise.allSettled — parallel D1 + R2 fetch -->
+        <rect x="178" y="598" width="104" height="18" rx="1" fill="#0d0d1a" stroke="#101030" stroke-width="0.8" />
+        <text x="230" y="611" text-anchor="middle" fill="#a0a0ff" font-size="9">Promise.allSettled([D1, R2])</text>
+
+        <line x1="238" y1="628" x2="502" y2="628" stroke="#6b6860" stroke-width="1.2" marker-end="url(#arr)" />
+        <text x="370" y="622" text-anchor="middle" fill="#ede8df" font-size="10">R2.get(uuid)</text>
+        <circle cx="230" cy="628" r="9" fill="#0a0a09" stroke="#6b6860" stroke-width="1" />
+        <text x="230" y="632" text-anchor="middle" fill="#6b6860" font-size="9">4</text>
+
+        <line x1="238" y1="645" x2="632" y2="645" stroke="#6b6860" stroke-width="1.2" marker-end="url(#arr)" />
+        <text x="435" y="639" text-anchor="middle" fill="#ede8df" font-size="10">SELECT alt_text WHERE id = ?</text>
+
+        <!-- R2 404 branch -->
+        <rect x="30" y="657" width="960" height="20" rx="1" fill="#1a0d0d" stroke="#3a1010" stroke-width="0.8" />
+        <text x="45" y="670" fill="#f4604d" font-size="9" font-style="italic">alt: R2 returns null → 404 | R2 error →
+            503 | D1 error is non-fatal (image still served)</text>
+
+        <!-- Step 5: RESPOND TO CLIENT IMMEDIATELY — this is the key non-blocking behaviour -->
+        <rect x="30" y="685" width="960" height="20" rx="1" fill="#1a1a0d" stroke="#3a3a10" stroke-width="0.8" />
+        <text x="45" y="698" fill="#e8f54d" font-size="9" font-style="italic">Worker responds to client IMMEDIATELY —
+            client never waits for AI</text>
+
+        <!-- ── ALT-TEXT EXISTS ── -->
+        <rect x="30" y="712" width="960" height="54" rx="1" fill="#0f0f0e" stroke="#222220" stroke-width="0.8" />
+        <text x="45" y="725" fill="#6b6860" font-size="9" font-style="italic">alt: alt_text exists in D1</text>
+
+        <line x1="222" y1="743" x2="88" y2="743" stroke="#4df4a0" stroke-width="1.5" marker-end="url(#arr-green)" />
+        <text x="148" y="737" text-anchor="middle" fill="#4df4a0" font-size="10">200 image bytes + X-Alt-Text:
+            [description]</text>
+        <circle cx="230" cy="743" r="9" fill="#0a0a09" stroke="#4df4a0" stroke-width="1.2" />
+        <text x="230" y="747" text-anchor="middle" fill="#4df4a0" font-size="9">5a</text>
+
+        <!-- ctx.waitUntil: cache.put with enriched headers -->
+        <line x1="238" y1="758" x2="372" y2="758" stroke="#6b6860" stroke-width="1" stroke-dasharray="3,2"
+            marker-end="url(#arr)" />
+        <text x="305" y="753" text-anchor="middle" fill="#6b6860" font-size="9">ctx.waitUntil: cache.put(key, response,
+            max-age=3600)</text>
+
+        <!-- ── NO ALT-TEXT — LAZY AI PATH ── -->
+        <rect x="30" y="775" width="960" height="240" rx="1" fill="#0f0f0e" stroke="#222220" stroke-width="0.8" />
+        <text x="45" y="789" fill="#6b6860" font-size="9" font-style="italic">alt: alt_text is NULL</text>
+
+        <!-- Respond immediately with Pending -->
+        <line x1="222" y1="805" x2="88" y2="805" stroke="#4df4a0" stroke-width="1.5" marker-end="url(#arr-green)" />
+        <text x="148" y="799" text-anchor="middle" fill="#4df4a0" font-size="10">200 image bytes + X-Alt-Text: Pending +
+            max-age=60,swr=300</text>
+        <circle cx="230" cy="805" r="9" fill="#0a0a09" stroke="#4df4a0" stroke-width="1.2" />
+        <text x="230" y="809" text-anchor="middle" fill="#4df4a0" font-size="9">5b</text>
+
+        <!-- ctx.waitUntil fires background work -->
+        <rect x="178" y="818" width="104" height="18" rx="1" fill="#1a1a0d" stroke="#3a3a10" stroke-width="0.8" />
+        <text x="230" y="831" text-anchor="middle" fill="#e8f54d" font-size="9">ctx.waitUntil(generateAndCache())</text>
+
+        <!-- BACKGROUND WORK box -->
+        <rect x="50" y="840" width="940" height="165" rx="2" fill="#111110" stroke="#2a2a28" stroke-width="1"
+            stroke-dasharray="5,3" />
+        <text x="65" y="854" fill="#6b6860" font-size="8" font-style="italic">background (after response sent)</text>
+
+        <!-- 6: KV check — already locked? -->
+        <line x1="238" y1="868" x2="772" y2="868" stroke="#6b6860" stroke-width="1.2" marker-end="url(#arr)" />
+        <text x="505" y="862" text-anchor="middle" fill="#ede8df" font-size="10">AI_QUOTA.get(ai:uuid) — check dedup
+            lock</text>
+        <circle cx="230" cy="868" r="9" fill="#0a0a09" stroke="#6b6860" stroke-width="1" />
+        <text x="230" y="872" text-anchor="middle" fill="#6b6860" font-size="9">6</text>
+
+        <!-- locked branch: exit -->
+        <rect x="50" y="880" width="940" height="20" rx="1" fill="#1a0d0d" stroke="#3a1010" stroke-width="0.8" />
+        <text x="65" y="893" fill="#f4604d" font-size="9" font-style="italic">alt: locked → exit immediately, AI already
+            in flight for this image (thundering herd protection)</text>
+
+        <!-- 7: Acquire KV lock -->
+        <line x1="238" y1="912" x2="772" y2="912" stroke="#6b6860" stroke-width="1.2" marker-end="url(#arr)" />
+        <text x="505" y="906" text-anchor="middle" fill="#ede8df" font-size="10">AI_QUOTA.put(ai:uuid, 1, ttl=300s) —
+            acquire lock</text>
+        <circle cx="230" cy="912" r="9" fill="#0a0a09" stroke="#6b6860" stroke-width="1" />
+        <text x="230" y="916" text-anchor="middle" fill="#6b6860" font-size="9">7</text>
+
+        <!-- 8: Call Workers AI -->
+        <line x1="238" y1="932" x2="922" y2="932" stroke="#6b6860" stroke-width="1.2" marker-end="url(#arr)" />
+        <text x="580" y="926" text-anchor="middle" fill="#ede8df" font-size="10">AI.run(llama-3.2-11b-vision,
+            &#123;image: Uint8Array, messages&#125;)</text>
+        <circle cx="230" cy="932" r="9" fill="#0a0a09" stroke="#6b6860" stroke-width="1" />
+        <text x="230" y="936" text-anchor="middle" fill="#6b6860" font-size="9">8</text>
+
+        <!-- AI returns response -->
+        <line x1="922" y1="950" x2="238" y2="950" stroke="#444440" stroke-width="1" stroke-dasharray="4,3"
+            marker-end="url(#arr-muted)" />
+        <text x="580" y="944" text-anchor="middle" fill="#6b6860" font-size="9">&#123;response:
+            "description..."&#125;</text>
+
+        <!-- sanitise note -->
+        <rect x="178" y="958" width="104" height="18" rx="1" fill="#1a1a10" stroke="#3a3a10" stroke-width="0.8" />
+        <text x="230" y="971" text-anchor="middle" fill="#e8f54d" font-size="9">sanitiseAltText()
+            strip+encode+truncate</text>
+
+        <!-- 9: D1 upsert alt_text -->
+        <line x1="238" y1="988" x2="632" y2="988" stroke="#6b6860" stroke-width="1.2" marker-end="url(#arr)" />
+        <text x="435" y="982" text-anchor="middle" fill="#ede8df" font-size="10">INSERT … ON CONFLICT UPDATE alt_text,
+            updated_at</text>
+        <circle cx="230" cy="988" r="9" fill="#0a0a09" stroke="#6b6860" stroke-width="1" />
+        <text x="230" y="992" text-anchor="middle" fill="#6b6860" font-size="9">9</text>
+
+        <!-- 10: Rebuild Cache API entry with enriched headers -->
+        <line x1="238" y1="1010" x2="372" y2="1010" stroke="#6b6860" stroke-width="1.2" marker-end="url(#arr)" />
+        <text x="305" y="1004" text-anchor="middle" fill="#ede8df" font-size="10">cache.put(key, response + X-Alt-Text,
+            max-age=3600)</text>
+        <circle cx="230" cy="1010" r="9" fill="#0a0a09" stroke="#6b6860" stroke-width="1" />
+        <text x="230" y="1014" text-anchor="middle" fill="#6b6860" font-size="9">10</text>
+
+        <!-- ═══════════════════════════════════════════════════════ -->
+        <!-- SECTION C: REPEAT REQUEST                              -->
+        <!-- ═══════════════════════════════════════════════════════ -->
+
+        <rect x="30" y="1040" width="960" height="22" rx="2" fill="#161614" />
+        <text x="45" y="1055" fill="#e8f54d" font-family="Syne,sans-serif" font-weight="700" font-size="10"
+            letter-spacing="0.1em">GET /images/:uuid — repeat request (any subsequent call)</text>
+
+        <line x1="88" y1="1080" x2="222" y2="1080" stroke="#6b6860" stroke-width="1.2" marker-end="url(#arr)" />
+        <text x="148" y="1074" text-anchor="middle" fill="#ede8df" font-size="10">GET /images/:uuid</text>
+
+        <line x1="238" y1="1098" x2="372" y2="1098" stroke="#6b6860" stroke-width="1.2" marker-end="url(#arr)" />
+        <text x="305" y="1092" text-anchor="middle" fill="#ede8df" font-size="10">caches.default.match(url)</text>
+
+        <line x1="372" y1="1116" x2="88" y2="1116" stroke="#4df4a0" stroke-width="2" marker-end="url(#arr-green)" />
+        <text x="230" y="1110" text-anchor="middle" fill="#4df4a0" font-size="10">HIT — 200 image + X-Alt-Text (zero
+            Worker/R2/D1/AI)</text>
+
+        <!-- ═══════════════════════════════════════════════════════ -->
+        <!-- LEGEND                                                  -->
+        <!-- ═══════════════════════════════════════════════════════ -->
+
+        <rect x="30" y="1150" width="960" height="22" rx="2" fill="#161614" />
+        <text x="45" y="1165" fill="#e8f54d" font-family="Syne,sans-serif" font-weight="700" font-size="10"
+            letter-spacing="0.1em">KEY</text>
+
+        <!-- legend items -->
+        <line x1="45" y1="1195" x2="110" y2="1195" stroke="#4df4a0" stroke-width="2" marker-end="url(#arr-green)" />
+        <text x="118" y="1199" fill="#ede8df" font-size="10">Response to client</text>
+
+        <line x1="250" y1="1195" x2="315" y2="1195" stroke="#6b6860" stroke-width="1.2" marker-end="url(#arr)" />
+        <text x="323" y="1199" fill="#ede8df" font-size="10">Request / async call</text>
+
+        <line x1="480" y1="1195" x2="545" y2="1195" stroke="#444440" stroke-width="1" stroke-dasharray="4,3"
+            marker-end="url(#arr-muted)" />
+        <text x="553" y="1199" fill="#ede8df" font-size="10">Return value</text>
+
+        <line x1="670" y1="1195" x2="735" y2="1195" stroke="#6b6860" stroke-width="1" stroke-dasharray="2,2"
+            marker-end="url(#arr)" />
+        <text x="743" y="1199" fill="#ede8df" font-size="10">External network call</text>
+
+        <rect x="45" y="1215" width="12" height="10" rx="1" fill="#1a1a10" stroke="#3a3a10" stroke-width="0.8" />
+        <text x="65" y="1224" fill="#ede8df" font-size="10">Worker-internal decision / guard</text>
+
+        <rect x="250" y="1215" width="12" height="10" rx="1" fill="#1a0d0d" stroke="#3a1010" stroke-width="0.8" />
+        <text x="270" y="1224" fill="#ede8df" font-size="10">Error / rejection path</text>
+
+        <rect x="480" y="1215" width="12" height="10" rx="1" fill="#111110" stroke="#2a2a28" stroke-width="1"
+            stroke-dasharray="3,2" />
+        <text x="500" y="1224" fill="#ede8df" font-size="10">Background work (after response returned)</text>
+
+        <!-- ── ACTOR BOXES (bottom) ── -->
+        <g font-family="Syne, sans-serif" font-weight="700" font-size="11.5" letter-spacing="0.06em">
+            <rect x="30" y="1250" width="100" height="32" rx="2" fill="#111110" stroke="#222220" stroke-width="1" />
+            <text x="80" y="1271" text-anchor="middle" fill="#ede8df">CLIENT</text>
+
+            <rect x="180" y="1250" width="100" height="32" rx="2" fill="#111110" stroke="#e8f54d" stroke-width="1" />
+            <text x="230" y="1271" text-anchor="middle" fill="#e8f54d">WORKER</text>
+
+            <rect x="330" y="1250" width="100" height="32" rx="2" fill="#111110" stroke="#222220" stroke-width="1" />
+            <text x="380" y="1271" text-anchor="middle" fill="#ede8df">CACHE API</text>
+
+            <rect x="460" y="1250" width="100" height="32" rx="2" fill="#111110" stroke="#222220" stroke-width="1" />
+            <text x="510" y="1271" text-anchor="middle" fill="#ede8df">R2</text>
+
+            <rect x="590" y="1250" width="100" height="32" rx="2" fill="#111110" stroke="#222220" stroke-width="1" />
+            <text x="640" y="1271" text-anchor="middle" fill="#ede8df">D1</text>
+
+            <rect x="730" y="1250" width="100" height="32" rx="2" fill="#111110" stroke="#222220" stroke-width="1" />
+            <text x="780" y="1271" text-anchor="middle" fill="#ede8df">KV STORE</text>
+
+            <rect x="880" y="1250" width="100" height="32" rx="2" fill="#111110" stroke="#222220" stroke-width="1" />
+            <text x="930" y="1271" text-anchor="middle" fill="#ede8df">WORKERS AI</text>
+        </g>
+
+    </svg>
+</body>
+
+</html>

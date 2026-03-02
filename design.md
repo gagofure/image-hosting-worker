@@ -6,7 +6,7 @@
 
 ImageWorker is an AI-powered image hosting service built entirely on Cloudflare's developer platform. It accepts image URLs via a REST API, stores the image bytes privately in R2, and automatically generates accessibility descriptions (alt-text) using a vision LLM — lazily, on first access, never at upload time.
 
-The service is deployed as a single Cloudflare Worker with no external dependencies at runtime. All storage, inference, caching, and rate limiting are handled by Cloudflare-native primitives, making the system globally distributed by default with no infrastructure to manage. A custom domain is served behind Cloudflare DNS, ensuring production-grade routing, full Cache API behavior at the edge, and an additional layer of network protection
+The service is deployed as a single Cloudflare Worker with no external dependencies at runtime. All storage, inference, caching, and rate limiting are handled by Cloudflare-native primitives, making the system globally distributed by default with no infrastructure to manage. A custom domain is served behind Cloudflare DNS, ensuring production-grade routing, full Cache API behavior at the edge, and an additional layer of network protection.
 
 ---
 
@@ -113,7 +113,7 @@ Rate limiting and AI deduplication are separated into two KV namespaces intentio
 8. Respond       201 with imageId and relative URL
 ```
 
-If D1 insert fails after a successful R2 write, a compensating `R2.delete()` is attempted to prevent orphaned objects. This is best-effort, the delete is fire-and-forget and logged on failure.
+If D1 insert fails after a successful R2 write, a compensating `R2.delete()` is attempted to prevent orphaned objects. This is best-effort — the delete is fire-and-forget and logged on failure.
 
 ### Image Serve — `GET /images/:uuid`
 
@@ -122,7 +122,7 @@ If D1 insert fails after a successful R2 write, a compensating `R2.delete()` is 
 2. Parallel fetch Promise.allSettled([D1.select alt_text, R2.get bytes])
                  D1 failure is non-fatal — image still served without alt-text
 3. Respond       200 with image bytes, X-Alt-Text, Cache-Control headers
-4. Background    ctx.waitUntil(generateAndCache()) if alt_text is null(no description)
+4. Background    ctx.waitUntil(generateAndCache()) if alt_text is null
                  ├── Acquire KV lock
                  ├── Call Workers AI vision model
                  ├── sanitiseAltText() — strip HTML, encode chars, truncate 500
@@ -154,7 +154,7 @@ CREATE UNIQUE INDEX idx_images_source_url
 
 The `UNIQUE` constraint on `source_url` enforces deduplication at the database level, independently of the application-layer check. The application check is a fast-path optimisation; the index is the invariant guarantee.
 
-The `alt_text` column being nullable is load-bearing — a `NULL` value is the signal that triggers AI generation. It is not an oversight; it is the state machine ( a system that behaves differently depending on what state it's in. Your Worker reads that column and makes a decision ).
+The `alt_text` column being nullable is load-bearing — a `NULL` value is the signal that triggers AI generation. It is not an oversight; it is the state machine (a system that behaves differently depending on what state it's in. Your Worker reads that column and makes a decision).
 
 ---
 
@@ -192,7 +192,7 @@ A sliding window of 100 requests per minute per IP is enforced via KV. The limit
 | Alt-text pending | `public, max-age=60, stale-while-revalidate=300` | Short-lived entry; rebuilt after AI completes |
 | Cache hit | — | Served from edge, zero Worker invocation |
 
-The `stale-while-revalidate=300` directive on pending responses allows the edge to serve the stale (pending) response for up to 5 minutes while revalidation happens in the background. This prevents a thundering herd (A thundering herd is when a large number of requests all hit your system at the same time for the same resource, overwhelming it) from hitting the Worker simultaneously when the 60-second TTL expires on a cold image.
+The `stale-while-revalidate=300` directive on pending responses allows the edge to serve the stale (pending) response for up to 5 minutes while revalidation happens in the background. This prevents a thundering herd from hitting the Worker simultaneously when the 60-second TTL expires on a cold image.
 
 Cache writes always use `ctx.waitUntil()` — they happen after the response is returned to the client, adding zero latency to the request.
 
@@ -207,6 +207,113 @@ The admin dashboard is a single-page application embedded as a string in `handle
 **SessionStorage for the token.** The admin token is stored in `sessionStorage` rather than `localStorage`. It survives page refreshes but is cleared when the tab closes, reducing the window of exposure compared to a persistent store.
 
 **Polling with guards.** The gallery polls `/audit?id=` every 3 seconds for images with pending alt-text. The poll stops immediately when the modal is closed and when alt-text is received — it never runs unnecessarily and never leaks beyond its intended scope.
+
+---
+
+## Deployment Configuration
+
+### `wrangler.jsonc`
+
+```jsonc
+{
+  "name": "imageworker",
+  "main": "src/worker.js",
+  "compatibility_date": "2024-09-23",
+
+  // R2 bucket — stores private image bytes
+  "r2_buckets": [
+    {
+      "binding": "IMAGES",
+      "bucket_name": "imageworker-images",
+      "preview_bucket_name": "imageworker-images-dev" // used by wrangler dev
+    }
+  ],
+
+  // D1 database — metadata and alt-text persistence
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "imageworker-db",
+      "database_id": "<your-d1-database-id>" // fill in after: wrangler d1 create imageworker-db
+    }
+  ],
+
+  // KV namespaces — rate limiting and AI deduplication lock
+  "kv_namespaces": [
+    {
+      "binding": "RATE_LIMIT",
+      "id": "<your-rate-limit-kv-id>",         // fill in after: wrangler kv namespace create RATE_LIMIT
+      "preview_id": "<your-rate-limit-kv-preview-id>"
+    },
+    {
+      "binding": "AI_QUOTA",
+      "id": "<your-ai-quota-kv-id>",           // fill in after: wrangler kv namespace create AI_QUOTA
+      "preview_id": "<your-ai-quota-kv-preview-id>"
+    }
+  ],
+
+  // Workers AI binding — vision model inference
+  "ai": {
+    "binding": "AI"
+  }
+
+  // ADMIN_TOKEN is not listed here — it is a secret, set via:
+  //   wrangler secret put ADMIN_TOKEN
+  // Secrets are never stored in wrangler.jsonc or committed to source control.
+}
+```
+
+### Bootstrap Steps
+
+Run these commands once before the first `wrangler deploy`. Each command outputs an ID — copy it into `wrangler.jsonc` where indicated.
+
+```bash
+# 1. Create the R2 bucket
+wrangler r2 bucket create imageworker-images
+
+# 2. Create the D1 database — copy the returned database_id into wrangler.jsonc
+wrangler d1 create imageworker-db
+
+# 3. Apply the schema and indexes (run against both local dev and production)
+wrangler d1 execute imageworker-db --file=./schema.sql
+wrangler d1 execute imageworker-db --remote --file=./schema.sql
+
+# 4. Create the KV namespaces — copy the returned IDs into wrangler.jsonc
+wrangler kv namespace create RATE_LIMIT
+wrangler kv namespace create AI_QUOTA
+
+# 5. Accept the Meta Llama license (required once per account before the model can be used)
+# Send a single request to Workers AI with { prompt: "agree" } via the dashboard or API.
+# See: https://developers.cloudflare.com/workers-ai/models/llama-3.2-11b-vision-instruct/
+
+# 6. Deploy first — the Worker must exist before a secret can be attached to it
+wrangler deploy
+
+# 7. Set the admin token secret — you will be prompted to enter the value
+wrangler secret put ADMIN_TOKEN
+```
+
+### `schema.sql`
+
+Save this file alongside `wrangler.jsonc` and reference it in step 3 above.
+
+```sql
+CREATE TABLE IF NOT EXISTS images (
+  id         TEXT PRIMARY KEY,
+  source_url TEXT UNIQUE,
+  alt_text   TEXT,
+  created_at TEXT DEFAULT (datetime('now')),
+  updated_at TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_images_created_at
+  ON images (created_at DESC);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_images_source_url
+  ON images (source_url);
+```
+
+`IF NOT EXISTS` guards on all statements make this migration safe to re-run — useful during local development or if bootstrap is accidentally repeated.
 
 ---
 
