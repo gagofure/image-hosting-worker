@@ -1,3 +1,5 @@
+[![Deploy Worker](https://github.com/gagofure/image-hosting-worker/actions/workflows/deploy-image-worker.yml/badge.svg)](https://github.com/gagofure/image-hosting-worker/actions/workflows/deploy-image-worker.yml)
+
 # ImageWorker
 
 ImageWorker is an AI-powered image hosting service built entirely on Cloudflare's developer platform. Upload an image URL, and ImageWorker stores it privately in R2, creates a metadata record in D1, and — on first access — automatically generates an accessibility description using a vision LLM. Every subsequent request is served from the global edge cache with zero compute.
@@ -310,6 +312,8 @@ wrangler dev --remote
 | `AI` | AI binding | Workers AI access |
 
 ---
+
+
 
 ## Author
 

@@ -16,6 +16,7 @@
  *   GET  /images/:uuid → serve image + X-Alt-Text header
  *   POST /upload       → upload image from external URL (auth required)
  *   GET  /audit        → paginated JSON inventory (auth required)
+ *   GET  /health   → health check endpoint for uptime monitoring and deployment pipelines
  *
  * NOTE: On first deploy, you must accept Meta's license for the vision model.
  *   Send one request to Workers AI with { prompt: "agree" } before normal use.
