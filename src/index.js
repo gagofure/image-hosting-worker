@@ -1344,6 +1344,7 @@ async function handleImage(imageId, request, env, ctx) {
   } else {
     ctx.waitUntil(
       generateAndCache(imageId, imageBytes, cacheKey, response.clone(), env, cache)
+      .catch(err => console.error('Background generation failed:', err.message))
     );
   }
 
